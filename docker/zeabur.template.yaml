@@ -1,0 +1,96 @@
+# ============================================================================
+# Zeabur deployment reference for Karakeep + Assistant
+# ----------------------------------------------------------------------------
+# Zeabur does not import docker-compose directly — you create each service
+# manually in the dashboard. This file is the canonical reference: copy the
+# values from each section into the matching Zeabur service.
+#
+# Order to create services (Karakeep depends on Meilisearch):
+#   1. meilisearch
+#   2. chrome
+#   3. karakeep   (the AIO web+workers container)
+#
+# See docker/README.zeabur.md for the click-through walkthrough.
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. Meilisearch — vector store + full-text index
+  # --------------------------------------------------------------------------
+  meilisearch:
+    source:
+      type: prebuilt-image
+      image: getmeili/meilisearch:v1.41.0
+    ports:
+      # Internal only; Karakeep reaches it via Zeabur's private network.
+      - port: 7700
+        type: TCP
+    volumes:
+      - mountPath: /meili_data
+        # Pick a small-to-medium volume in Zeabur UI. Vectors are compact.
+    env:
+      MEILI_MASTER_KEY: "${MEILI_MASTER_KEY}"   # share with karakeep service
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_ENV: "production"
+
+  # --------------------------------------------------------------------------
+  # 2. Headless Chrome — used by the bookmark crawler
+  # --------------------------------------------------------------------------
+  chrome:
+    source:
+      type: prebuilt-image
+      image: gcr.io/zenika-hub/alpine-chrome:124
+    ports:
+      - port: 9222
+        type: TCP
+    command:
+      - --no-sandbox
+      - --disable-gpu
+      - --disable-dev-shm-usage
+      - --remote-debugging-address=0.0.0.0
+      - --remote-debugging-port=9222
+      - --hide-scrollbars
+
+  # --------------------------------------------------------------------------
+  # 3. Karakeep AIO — web + workers + migration runner (s6-overlay)
+  # --------------------------------------------------------------------------
+  karakeep:
+    source:
+      type: git
+      # In Zeabur dashboard: connect your fork of this repo.
+      branch: main
+      dockerfile: docker/Dockerfile
+      build:
+        target: aio
+        # Zeabur builds on amd64 by default — keep that to match Linux servers.
+        # (linux/arm64 builds on Apple Silicon are only useful locally.)
+    ports:
+      - port: 3000
+        type: HTTP
+        # Zeabur attaches a free *.zeabur.app domain automatically; add a
+        # custom domain in service Settings → Domains afterwards.
+    volumes:
+      - mountPath: /data
+        # SQLite database, crawled assets, backups. Size based on bookmark
+        # volume; start at 5–10 GB.
+    env:
+      # --- Required secrets ----------------------------------------------
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET}"      # openssl rand -hex 32
+      MEILI_MASTER_KEY: "${MEILI_MASTER_KEY}"    # same as Meilisearch above
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+
+      # --- Public URL (set to your final domain after deploy) ------------
+      NEXTAUTH_URL: "https://${ZEABUR_WEB_DOMAIN}"
+
+      # --- Wiring between services (Zeabur private DNS) ------------------
+      DATA_DIR: "/data"
+      MEILI_ADDR: "http://meilisearch.zeabur.internal:7700"
+      BROWSER_WEB_URL: "http://chrome.zeabur.internal:9222"
+
+      # --- Assistant defaults --------------------------------------------
+      EMBEDDING_ENABLE_AUTO_INDEXING: "true"
+      INFERENCE_ENABLE_AUTO_TAGGING: "true"
+      INFERENCE_ENABLE_AUTO_SUMMARIZATION: "true"
+
+      # --- Optional: lock signups after first admin registers ------------
+      # DISABLE_SIGNUPS: "true"

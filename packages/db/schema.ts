@@ -961,6 +961,49 @@ export const importStagingBookmarks = sqliteTable(
   ],
 );
 
+export const assistantConversations = sqliteTable(
+  "assistantConversations",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull().default("New conversation"),
+    createdAt: createdAtField(),
+    modifiedAt: modifiedAtField(),
+  },
+  (tb) => [
+    index("assistantConversations_userId_idx").on(tb.userId),
+    index("assistantConversations_modifiedAt_idx").on(tb.modifiedAt),
+  ],
+);
+
+export const assistantMessages = sqliteTable(
+  "assistantMessages",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    conversationId: text("conversationId")
+      .notNull()
+      .references(() => assistantConversations.id, { onDelete: "cascade" }),
+    role: text("role", {
+      enum: ["user", "assistant", "system"],
+    }).notNull(),
+    content: text("content").notNull(),
+    // JSON array of { bookmarkId, score, title } objects used as RAG context
+    sources: text("sources", { mode: "json" }).$type<
+      { bookmarkId: string; score: number; title: string | null }[]
+    >(),
+    createdAt: createdAtField(),
+  },
+  (tb) => [index("assistantMessages_conversationId_idx").on(tb.conversationId)],
+);
+
 // Relations
 
 export const userRelations = relations(users, ({ many, one }) => ({
@@ -974,7 +1017,29 @@ export const userRelations = relations(users, ({ many, one }) => ({
   listCollaborations: many(listCollaborators),
   backups: many(backupsTable),
   listInvitations: many(listInvitations),
+  assistantConversations: many(assistantConversations),
 }));
+
+export const assistantConversationsRelations = relations(
+  assistantConversations,
+  ({ many, one }) => ({
+    user: one(users, {
+      fields: [assistantConversations.userId],
+      references: [users.id],
+    }),
+    messages: many(assistantMessages),
+  }),
+);
+
+export const assistantMessagesRelations = relations(
+  assistantMessages,
+  ({ one }) => ({
+    conversation: one(assistantConversations, {
+      fields: [assistantMessages.conversationId],
+      references: [assistantConversations.id],
+    }),
+  }),
+);
 
 export const bookmarkRelations = relations(bookmarks, ({ many, one }) => ({
   user: one(users, {

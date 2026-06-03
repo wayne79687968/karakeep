@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Highlighter,
   Home,
+  MessageSquare,
   Search,
   Tag,
 } from "lucide-react";
@@ -85,6 +86,11 @@ export default async function Dashboard({
         name: t("common.archive"),
         icon: <Archive size={18} />,
         path: "/dashboard/archive",
+      },
+      {
+        name: "Assistant",
+        icon: <MessageSquare size={18} />,
+        path: "/dashboard/assistant",
       },
     ].flat();
 

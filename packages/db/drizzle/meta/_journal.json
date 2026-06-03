@@ -603,6 +603,13 @@
       "when": 1780154803212,
       "tag": "0085_add_embedding_status",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "6",
+      "when": 1780381375913,
+      "tag": "0086_add_assistant_conversations",
+      "breakpoints": true
     }
   ]
 }
