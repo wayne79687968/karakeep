@@ -126,6 +126,70 @@ async function getIds(
           ),
         );
     }
+    case "tagNameRegex": {
+      // Compile the user-supplied pattern in JS. If it's invalid we treat it
+      // as matching nothing (so the smart list rule simply has no effect
+      // rather than crashing the whole query).
+      let regex: RegExp | null = null;
+      try {
+        regex = new RegExp(matcher.tagNameRegex, "i");
+      } catch {
+        regex = null;
+      }
+
+      // Find every tag name the user owns that the regex matches, then fall
+      // back to the same EXISTS / NOT EXISTS subquery shape as tagName.
+      // Tag tables are small per-user (typically <10k rows) so this is fine.
+      const matchedTagNames = regex
+        ? (
+            await db
+              .select({ name: bookmarkTags.name })
+              .from(bookmarkTags)
+              .where(eq(bookmarkTags.userId, userId))
+          )
+            .map((r) => r.name)
+            .filter((name) => regex!.test(name))
+        : [];
+
+      if (matchedTagNames.length === 0) {
+        // No tag matched the pattern.
+        //   - non-inverse → "bookmarks with such a tag" → empty set
+        //   - inverse     → "bookmarks WITHOUT such a tag" → all bookmarks
+        if (matcher.inverse) {
+          return db
+            .select({ id: bookmarks.id })
+            .from(bookmarks)
+            .where(eq(bookmarks.userId, userId));
+        }
+        return [];
+      }
+
+      const comp = matcher.inverse ? notExists : exists;
+      return db
+        .selectDistinct({ id: bookmarks.id })
+        .from(bookmarks)
+        .where(
+          and(
+            eq(bookmarks.userId, userId),
+            comp(
+              db
+                .select()
+                .from(tagsOnBookmarks)
+                .innerJoin(
+                  bookmarkTags,
+                  eq(tagsOnBookmarks.tagId, bookmarkTags.id),
+                )
+                .where(
+                  and(
+                    eq(tagsOnBookmarks.bookmarkId, bookmarks.id),
+                    eq(bookmarkTags.userId, userId),
+                    inArray(bookmarkTags.name, matchedTagNames),
+                  ),
+                ),
+            ),
+          ),
+        );
+    }
     case "tagged": {
       const comp = matcher.tagged ? exists : notExists;
       return db

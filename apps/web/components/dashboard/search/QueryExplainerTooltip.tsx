@@ -41,6 +41,17 @@ export default function QueryExplainerTooltip({
             <TableCell>{matcher.tagName}</TableCell>
           </TableRow>
         );
+      case "tagNameRegex":
+        return (
+          <TableRow>
+            <TableCell>
+              {matcher.inverse
+                ? t("search.does_not_have_tag")
+                : t("search.has_tag")}
+            </TableCell>
+            <TableCell>/{matcher.tagNameRegex}/i</TableCell>
+          </TableRow>
+        );
       case "listName":
         return (
           <TableRow>

@@ -8,6 +8,14 @@ const zTagNameMatcher = z.object({
   inverse: z.boolean(),
 });
 
+const zTagNameRegexMatcher = z.object({
+  type: z.literal("tagNameRegex"),
+  // JavaScript-compatible regex pattern (without the surrounding slashes).
+  // Matched case-insensitively against bookmark tag names.
+  tagNameRegex: z.string(),
+  inverse: z.boolean(),
+});
+
 const zListNameMatcher = z.object({
   type: z.literal("listName"),
   listName: z.string(),
@@ -96,6 +104,7 @@ const zSourceMatcher = z.object({
 
 const zNonRecursiveMatcher = z.union([
   zTagNameMatcher,
+  zTagNameRegexMatcher,
   zListNameMatcher,
   zArchivedMatcher,
   zUrlMatcher,
@@ -121,6 +130,7 @@ export type Matcher =
 export const zMatcherSchema: z.ZodType<Matcher> = z.lazy(() => {
   return z.discriminatedUnion("type", [
     zTagNameMatcher,
+    zTagNameRegexMatcher,
     zListNameMatcher,
     zArchivedMatcher,
     zUrlMatcher,

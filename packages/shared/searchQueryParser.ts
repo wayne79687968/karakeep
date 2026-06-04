@@ -215,6 +215,20 @@ MATCHER.setPattern(
             };
           case "#":
           case "tag:":
+            // If the value contains regex meta-characters, treat it as a
+            // regex pattern instead of an exact match. This lets smart-list
+            // rules write things like  tag:.*攝影  to also catch
+            // 風景攝影 / 天文攝影 etc.
+            if (/[.*+?^$()|[\]\\]/.test(ident)) {
+              return {
+                text: "",
+                matcher: {
+                  type: "tagNameRegex",
+                  tagNameRegex: ident,
+                  inverse: !!minus,
+                },
+              };
+            }
             return {
               text: "",
               matcher: { type: "tagName", tagName: ident, inverse: !!minus },

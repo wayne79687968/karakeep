@@ -1,0 +1,6 @@
+{
+  "build_command": null,
+  "start_command": null,
+  "dockerfile": "docker/Dockerfile",
+  "dockerfile_target": "aio"
+}
